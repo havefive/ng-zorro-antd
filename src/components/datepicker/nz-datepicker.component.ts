@@ -13,7 +13,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { DropDownAnimation } from '../core/animation/dropdown-animations';
 import { NzTimePickerInnerComponent } from '../time-picker/nz-timepicker-inner.component';
 import { DEFAULT_DATEPICKER_POSITIONS } from '../core/overlay/overlay-position-map';
-import { ConnectionPositionPair } from '../core/overlay';
+import { ConnectionPositionPair } from '../core/overlay/index';
 
 @Component({
   selector     : 'nz-datepicker',
@@ -29,15 +29,15 @@ import { ConnectionPositionPair } from '../core/overlay';
       #trigger>
       <input
         nz-input
-        [class.ant-input-disabled]="nzDisabled"
+        (blur)="onTouched()"
         [attr.placeholder]="nzPlaceHolder"
-        [disabled]="nzDisabled"
+        [nzDisabled]="nzDisabled"
         [nzSize]="nzSize"
         class="ant-calendar-picker-input"
         [value]="_value|nzDate:nzFormat">
       <i class="ant-calendar-picker-clear anticon anticon-cross-circle"
         *ngIf="_showClearIcon"
-        (click)="_clearValue($event)">
+        (click)="onTouched();_clearValue($event)">
       </i>
       <span class="ant-calendar-picker-icon"></span>
     </span>
@@ -71,8 +71,8 @@ import { ConnectionPositionPair } from '../core/overlay';
                 <a class="ant-calendar-prev-year-btn" title="上一年" (click)="_preYear()"></a>
                 <a class="ant-calendar-prev-month-btn" title="上个月" (click)="_preMonth()"></a>
                 <span class="ant-calendar-ym-select">
-                  <a class="ant-calendar-year-select" title="选择月份" (click)="_changeDecadeView($event)">{{_showYear}}年</a>
-                  <a class="ant-calendar-month-select" title="选择月份" (click)="_changeMonthView()">{{_showMonth + 1}}月</a>
+                <a class="ant-calendar-month-select" title="选择月份" (click)="_changeMonthView()">{{_showMonth + 1}}月</a>
+                <a class="ant-calendar-year-select" title="选择年份" (click)="_changeDecadeView($event)">{{_showYear}}年</a>
                 </span>
                 <a class="ant-calendar-next-month-btn" title="下个月" (click)="_nextMonth()"></a>
                 <a class="ant-calendar-next-year-btn" title="下一年" (click)="_nextYear()"></a>
@@ -187,6 +187,7 @@ export class NzDatePickerComponent implements ControlValueAccessor, OnInit {
   _dropDownPosition = 'bottom';
   _triggerWidth = 0;
   _value = null;
+  _disabled = false;
   _today = new Date();
   _selectedMonth = moment(this.nzValue).month();
   _selectedYear = moment(this.nzValue).year();
@@ -205,10 +206,19 @@ export class NzDatePickerComponent implements ControlValueAccessor, OnInit {
   @Input() nzPlaceHolder = '请选择日期';
   @Input() nzFormat = 'YYYY-MM-DD';
   @Input() nzSize = '';
-  @Input() nzDisabled = false;
   @ViewChild('trigger') trigger;
   @ViewChild(NzTimePickerInnerComponent) timePickerInner: NzTimePickerInnerComponent;
   @HostBinding('class.ant-calendar-picker') _nzCalendarPicker = true;
+
+  @Input()
+  get nzDisabled(): boolean {
+    return this._disabled;
+  };
+
+  set nzDisabled(value: boolean) {
+    this._disabled = value;
+    this._closeCalendar();
+  }
 
   _setTriggerWidth(): void {
     this._triggerWidth = this.trigger.nativeElement.getBoundingClientRect().width;
@@ -228,16 +238,7 @@ export class NzDatePickerComponent implements ControlValueAccessor, OnInit {
   };
 
   set nzValue(value: Date) {
-    if (this._value === value) {
-      return;
-    }
-    this._value = value;
-    this._selectedMonth = moment(this.nzValue).month();
-    this._selectedYear = moment(this.nzValue).year();
-    this._selectedDate = moment(this.nzValue).date();
-    this._showYear = moment(this.nzValue).year();
-    this._showMonth = moment(this.nzValue).month();
-    this._startDecade = Math.floor(this._showYear / 10) * 10;
+    this._updateValue(value);
   };
 
   _changeTime($event) {
@@ -390,7 +391,8 @@ export class NzDatePickerComponent implements ControlValueAccessor, OnInit {
   }
 
   writeValue(value: any): void {
-    this.nzValue = value;
+    // this.nzValue = value;
+    this._updateValue(value);
   }
 
   registerOnChange(fn: (_: any) => {}): void {
@@ -399,5 +401,22 @@ export class NzDatePickerComponent implements ControlValueAccessor, OnInit {
 
   registerOnTouched(fn: () => {}): void {
     this.onTouched = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.nzDisabled = isDisabled;
+  }
+
+  private _updateValue(value: any) {
+    if (this._value === value) {
+      return;
+    }
+    this._value = value;
+    this._selectedMonth = moment(this.nzValue).month();
+    this._selectedYear = moment(this.nzValue).year();
+    this._selectedDate = moment(this.nzValue).date();
+    this._showYear = moment(this.nzValue).year();
+    this._showMonth = moment(this.nzValue).month();
+    this._startDecade = Math.floor(this._showYear / 10) * 10;
   }
 }

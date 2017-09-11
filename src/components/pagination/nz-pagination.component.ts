@@ -20,7 +20,7 @@ import {
         <a></a>
       </li>
       <li [attr.title]="_current+'/'+_lastIndex" class="ant-pagination-simple-pager">
-        <input [(ngModel)]="nzPageIndex" size="3"><span class="ant-pagination-slash">／</span>{{_lastIndex}}
+        <input [ngModel]="nzPageIndex" (ngModelChange)="_nzPageIndexChange($event)" size="3"><span class="ant-pagination-slash">／</span>{{_lastIndex}}
       </li>
       <li
         title="下一页"
@@ -103,7 +103,7 @@ import {
         </nz-select>
         <div class="ant-pagination-options-quick-jumper"
           *ngIf="nzShowQuickJumper">
-          跳至<input [(ngModel)]="nzPageIndex">页
+          跳至<input [ngModel]="nzPageIndex" (ngModelChange)="_nzPageIndexChange($event)">页
         </div>
       </div>
     </ul>`,
@@ -244,6 +244,11 @@ export class NzPaginationComponent {
     this.nzPageSizeChange.emit($event);
   }
 
+  _nzPageIndexChange($event) {
+    this.nzPageIndex = $event;
+    this.nzPageIndexChange.emit(this.nzPageIndex);
+  }
+
   /** generate indexes list */
   _buildIndexes() {
     this._lastIndex = Math.ceil(this._total / this._pageSize);
@@ -284,6 +289,7 @@ export class NzPaginationComponent {
       this.nzPageIndex = index;
     }
     this.nzPageIndexClickChange.emit(this.nzPageIndex);
+    this.nzPageIndexChange.emit(this.nzPageIndex);
   }
 
   get _isLastIndex() {

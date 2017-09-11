@@ -79,6 +79,7 @@ import { TagAnimation } from '../core/animation/tag-animations';
                 [(ngModel)]="_searchText"
                 (ngModelChange)="updateFilterOption();onSearchChange($event);"
                 (keydown)="updateWidth(searchInput,_searchText)"
+                (blur)="onTouched()"
                 #searchInput>
               <span class="ant-select-search__field__mirror"></span></div>
           </li>
@@ -93,6 +94,7 @@ import { TagAnimation } from '../core/animation/tag-animations';
           <div class="ant-select-search__field__wrap">
             <input
               class="ant-select-search__field"
+              (blur)="onTouched()"
               (compositionstart)="compositionStart()"
               (compositionend)="compositionEnd()"
               [(ngModel)]="_searchText"
@@ -103,7 +105,7 @@ import { TagAnimation } from '../core/animation/tag-animations';
         </div>
       </div>
       <span
-        (click)="clearSelect($event)"
+        (click)="onTouched();clearSelect($event)"
         class="ant-select-selection__clear"
         style="-webkit-user-select: none;"
         *ngIf="_selectedOption?.nzLabel&&nzAllowClear&&!nzMultiple">
@@ -289,6 +291,7 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
 
   set nzDisabled(value: boolean) {
     this._disabled = value;
+    this.closeDropDown();
     this.setClassMap();
   }
 
@@ -403,10 +406,12 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
   }
 
   /** cancel select multiple option */
-  unSelectMultipleOption = (option, $event?) => {
+  unSelectMultipleOption = (option, $event?, emitChange = true) => {
     this._operatingMultipleOption = option;
     this._selectedOptions.delete(option);
-    this.emitMultipleOptions();
+    if (emitChange) {
+      this.emitMultipleOptions();
+    }
 
     // 对Tag进行特殊处理
     if (this._isTags && (this._options.indexOf(option) !== -1) && (this._tagsOptions.indexOf(option) !== -1)) {
@@ -489,31 +494,12 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
   };
 
   set nzValue(value: Array<string> | string) {
-    if (this._value === value) {
-      return;
-    }
-    this._value = value;
-    if (!this.nzMultiple) {
-      if (value === null) {
-        this._selectedOption = null;
-      } else {
-        this.updateSelectedOption(value);
-      }
-    } else {
-      if (value) {
-        if (value.length === 0) {
-          this.clearAllSelectedOption();
-        } else {
-          this.updateSelectedOption(value, true);
-        }
-      }
-
-    }
+    this._updateValue(value);
   }
 
-  clearAllSelectedOption() {
+  clearAllSelectedOption(emitChange = true) {
     this._selectedOptions.forEach(item => {
-      this.unSelectMultipleOption(item);
+      this.unSelectMultipleOption(item, null, emitChange);
     });
   }
 
@@ -579,7 +565,7 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
     }
 
     /** TODO: cause pre & next key selection not work */
-    if (updateActiveFilter) {
+    if (updateActiveFilter && !this._selectedOption) {
       this._activeFilterOption = this._filterOptions[ 0 ];
     }
   }
@@ -607,6 +593,7 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
     if (!this.nzOpen) {
       return;
     }
+    this.onTouched();
     if (this.nzMultiple) {
       this._renderer.removeStyle(this.searchInputElementRef.nativeElement, 'width');
     }
@@ -685,7 +672,8 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
   }
 
   writeValue(value: any): void {
-    this.nzValue = value;
+    // this.nzValue = value;
+    this._updateValue(value, false);
   }
 
   registerOnChange(fn: (_: any) => {}): void {
@@ -694,6 +682,10 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
 
   registerOnTouched(fn: () => {}): void {
     this.onTouched = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.nzDisabled = isDisabled;
   }
 
   constructor(private _elementRef: ElementRef, private _renderer: Renderer2) {
@@ -720,6 +712,33 @@ export class NzSelectComponent implements OnInit, AfterContentInit, AfterContent
     } else {
       this.updateFilterOption(false);
     }
+  }
 
+  private _updateValue(value: string[] | string, emitChange = true) {
+    if (this._value === value) {
+      return;
+    }
+    if ((value === null) && this.nzMultiple) {
+      this._value = [];
+    } else {
+      this._value = value;
+    }
+    if (!this.nzMultiple) {
+      if (value === null) {
+        this._selectedOption = null;
+      } else {
+        this.updateSelectedOption(value);
+      }
+    } else {
+      if (value) {
+        if (value.length === 0) {
+          this.clearAllSelectedOption(emitChange);
+        } else {
+          this.updateSelectedOption(value, true);
+        }
+      } else if (value === null) {
+        this.clearAllSelectedOption(emitChange);
+      }
+    }
   }
 }

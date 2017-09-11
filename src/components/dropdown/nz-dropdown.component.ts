@@ -7,25 +7,32 @@ import {
   Renderer2,
   ContentChild,
   Output,
-  EventEmitter, AfterViewInit
+  EventEmitter,
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef
 } from '@angular/core';
-import { Subject } from 'rxjs/Subject';
+import { merge } from 'rxjs/observable/merge';
 import { debounceTime } from 'rxjs/operator/debounceTime';
+import { Observable } from 'rxjs/Observable';
+import { Subscription } from 'rxjs/Subscription';
+import { Observer } from 'rxjs/Observer'
 import { NzMenuComponent } from '../menu/nz-menu.component';
 import { DropDownAnimation } from '../core/animation/dropdown-animations';
 import { NzDropDownDirective } from './nz-dropdown.directive';
 import { POSITION_MAP, DEFAULT_DROPDOWN_POSITIONS } from '../core/overlay/overlay-position-map';
-import { ConnectionPositionPair } from '../core/overlay';
+import { ConnectionPositionPair } from '../core/overlay/index';
 
 export type NzPlacement = 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLeft' | 'topCenter' | 'topRight';
 
 @Component({
-  selector     : 'nz-dropdown',
-  encapsulation: ViewEncapsulation.None,
-  animations   : [
+  selector       : 'nz-dropdown',
+  encapsulation  : ViewEncapsulation.None,
+  animations     : [
     DropDownAnimation
   ],
-  template     : `
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template       : `
     <div>
       <ng-content></ng-content>
     </div>
@@ -46,21 +53,26 @@ export type NzPlacement = 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLe
         (mouseleave)="_onMouseLeaveEvent($event)"
         [style.minWidth.px]="_triggerWidth"
         (click)="_clickDropDown($event)">
-        <ng-content select="[nz-menu]"></ng-content>
+        <div [class.ant-table-filter-dropdown]="hasFilterButton">
+          <ng-content select="[nz-menu]"></ng-content>
+          <ng-content select="[nz-table-filter]"></ng-content>
+        </div>
+        <ng-content select="[nz-dropdown-custom]"></ng-content>
       </div>
     </ng-template>`,
-  styleUrls    : [
+  styleUrls      : [
     './style/index.less',
     './style/patch.less'
   ]
 })
 
 export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
+  hasFilterButton = false;
   _triggerWidth = 0;
-  _$mouseSubject = new Subject();
   _placement: NzPlacement = 'bottomLeft';
   _dropDownPosition: 'top' | 'bottom' = 'bottom';
   _positions: ConnectionPositionPair[] = [ ...DEFAULT_DROPDOWN_POSITIONS ];
+  _subscription: Subscription;
   @ContentChild(NzDropDownDirective) _nzOrigin;
   @ContentChild(NzMenuComponent) _nzMenu;
   @Input() nzTrigger: 'click' | 'hover' = 'hover';
@@ -97,6 +109,14 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  _hide() {
+    this.nzVisibleChange.emit(false);
+  }
+
+  _show() {
+    this.nzVisibleChange.emit(true);
+  }
+
   _onPositionChange(position) {
     this._dropDownPosition = position.connectionPair.originY;
   }
@@ -112,49 +132,67 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
     this._triggerWidth = this._nzOrigin.elementRef.nativeElement.getBoundingClientRect().width;
   }
 
-  _show() {
-    this._$mouseSubject.next(true);
+  _onVisibleChange = (visible: boolean) => {
+    if (visible) {
+      if (!this._triggerWidth) {
+        this._setTriggerWidth();
+      }
+    }
+    this.nzVisible = visible;
+    this._changeDetector.markForCheck();
   }
 
-  _hide() {
-    this._$mouseSubject.next(false);
+  _startSubscribe(observable$: Observable<boolean>) {
+    this._subscription = debounceTime.call(observable$, 300)
+      .subscribe(this._onVisibleChange)
   }
 
   ngOnInit() {
-    debounceTime.call(this._$mouseSubject, 300).subscribe((data: boolean) => {
-      this.nzVisible = data;
-      if (this.nzVisible) {
-        if (!this._triggerWidth) {
-          this._setTriggerWidth();
-        }
-      }
-      this.nzVisibleChange.emit(this.nzVisible);
-    });
-    this._nzMenu.setDropDown(true);
+    if (this._nzMenu) {
+      this._nzMenu.setDropDown(true);
+    }
   }
 
   ngOnDestroy() {
-    this._$mouseSubject.unsubscribe();
+    this._subscription.unsubscribe();
   }
 
-
   ngAfterViewInit() {
+    let mouse$: Observable<boolean>
     if (this.nzTrigger === 'hover') {
-      this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'mouseenter', () => this._show());
-      this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'mouseleave', () => this._hide());
-    }
-    if (this.nzTrigger === 'click') {
-      this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'click', (e) => {
-        e.preventDefault();
-        this._show()
+      mouse$ = Observable.create((observer: Observer<boolean>) => {
+        const disposeMouseEnter = this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'mouseenter', () => {
+          observer.next(true);
+        });
+        const disposeMouseLeave = this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'mouseleave', () => {
+          observer.next(false);
+        });
+        return () => {
+          disposeMouseEnter();
+          disposeMouseLeave();
+        }
       });
     }
+    if (this.nzTrigger === 'click') {
+      mouse$ = Observable.create((observer: Observer<boolean>) => {
+        const dispose = this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'click', (e) => {
+          e.preventDefault();
+          observer.next(true);
+        });
+        return () => dispose();
+      });
+    }
+    const observable$ = merge(
+      mouse$,
+      this.nzVisibleChange.asObservable()
+    );
+    this._startSubscribe(observable$);
   }
 
   get _hasBackdrop() {
     return this.nzTrigger === 'click';
   }
 
-  constructor(private _renderer: Renderer2) {
+  constructor(private _renderer: Renderer2, protected _changeDetector: ChangeDetectorRef) {
   }
 }

@@ -9,7 +9,6 @@ import {
   EventEmitter,
   AfterViewInit
 } from '@angular/core';
-import { debounceTime } from 'rxjs/operator/debounceTime';
 import { DropDownAnimation } from '../core/animation/dropdown-animations';
 import { NzDropDownDirective } from './nz-dropdown.directive';
 import { NzDropDownComponent } from './nz-dropdown.component';
@@ -74,24 +73,21 @@ export class NzDropDownButtonComponent extends NzDropDownComponent implements On
   @Output() nzClick = new EventEmitter();
   @ViewChild(NzDropDownDirective) _nzOrigin;
 
-  ngOnInit() {
-    debounceTime.call(this._$mouseSubject, 300).subscribe((data: boolean) => {
-      if (this.nzDisable) {
-        return;
+  _onVisibleChange = (visible: boolean) => {
+    if (this.nzDisable) {
+      return;
+    }
+    if (visible) {
+      if (!this._triggerWidth) {
+        this._setTriggerWidth();
       }
-      this.nzVisible = data;
-      if (this.nzVisible) {
-        if (!this._triggerWidth) {
-          this._setTriggerWidth();
-        }
-      }
-      this.nzVisibleChange.emit(this.nzVisible);
-    });
-    this._nzMenu.setDropDown(true);
+    }
+    this.nzVisible = visible;
+    this._changeDetector.markForCheck();
   }
 
   /** rewrite afterViewInit hook */
   ngAfterViewInit() {
-
+    this._startSubscribe(this.nzVisibleChange.asObservable());
   }
 }

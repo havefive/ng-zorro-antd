@@ -2,7 +2,7 @@ import { BrowserModule, Title } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { FormsModule } from '@angular/forms';
-import { HttpModule } from '@angular/http';
+import { HttpClientModule } from '@angular/common/http';
 import { RouterModule, PreloadAllModules } from '@angular/router';
 import { routes } from './app.routing.module';
 import { AppComponent } from './app.component';
@@ -18,8 +18,8 @@ import { NzHighlightModule } from './share/nz-highlight/nz-highlight.module';
     BrowserModule,
     BrowserAnimationsModule,
     FormsModule,
-    HttpModule,
-    NgZorroAntdModule.forRoot(),
+    HttpClientModule,
+    NgZorroAntdModule.forRoot({ extraFontName: 'anticon', extraFontUrl: './assets/fonts/iconfont' }),
     NzCodeBoxModule,
     NzHighlightModule,
     RouterModule.forRoot(routes, { useHash: true, preloadingStrategy: PreloadAllModules })
