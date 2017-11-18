@@ -27,17 +27,17 @@ import {
   UP_ARROW,
   DOWN_ARROW,
   ENTER,
-} from '@angular/cdk';
+} from '@angular/cdk/keycodes';
 const ESC = 27;
 
 import { DropDownAnimation } from '../core/animation/dropdown-animations';
-import { ConnectionPositionPair } from '../core/overlay/index';
+import { ConnectionPositionPair } from '@angular/cdk/overlay';
 
 function noop(): void { }
 
 function toArray(value: any): any[] {
   let ret = value;
-  if (value === undefined) {
+  if (value === undefined || value === null) {
       ret = [];
   } else if (!Array.isArray(value)) {
       ret = [value];
@@ -85,8 +85,8 @@ export interface CascaderOption {
   ],
   template       : `
     <div
-      nz-overlay-origin
-      #origin="nzOverlayOrigin"
+      cdkOverlayOrigin
+      #origin="cdkOverlayOrigin"
       #trigger
     >
       <div *ngIf="nzShowInput">
@@ -122,13 +122,13 @@ export interface CascaderOption {
       <ng-content></ng-content>
     </div>
     <ng-template
-      nz-connected-overlay
-      hasBackdrop
-      [origin]="origin"
+      cdkConnectedOverlay
+      cdkConnectedOverlayHasBackdrop
+      [cdkConnectedOverlayOrigin]="origin"
       (backdropClick)="_closeMenu()"
       (detach)="_closeMenu()"
       (positionChange)="onPositionChange($event)"
-      [open]="_popupVisible"
+      [cdkConnectedOverlayOpen]="_popupVisible"
     >
       <div #menu
         [ngClass]="_menuCls"
@@ -762,6 +762,11 @@ export class NzCascaderComponent implements OnInit, OnDestroy, OnChanges, AfterV
       }, (reason: any) => {
         option.isLeaf = true;
       });
+    } else {
+      // clicking leaf node will remove any children columns
+      if (index < this._nzColumns.length - 1) {
+        this._nzColumns = this._nzColumns.slice(0, index + 1);
+      }
     }
 
     // 生成显示
@@ -982,10 +987,6 @@ export class NzCascaderComponent implements OnInit, OnDestroy, OnChanges, AfterV
    * @Override (From ControlValueAccessor interface)
    */
   writeValue(value: any): void {
-    if (value == null) {
-      return;
-    }
-
     const array: any[] = [];
     toArray(value).forEach((v: any, index: number) => {
       if (typeof v !== 'object') {

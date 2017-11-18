@@ -12,6 +12,7 @@ import { NzModalComponent } from './nz-modal.component';
 import { NzConfirmComponent } from './nz-confirm.component';
 import { ModalOptions, ConfirmOptions } from './nz-modal-options.provider';
 import { NzModalSubject } from './nz-modal-subject.service';
+import { NzLocaleService } from '../locale/index';
 
 export interface ConfigInterface {
   type?: string;
@@ -29,6 +30,7 @@ export interface ConfigInterface {
   maskClosable?: boolean;
   wrapClassName?: string;
   footer?: TemplateRef<any> | boolean;
+  showConfirmLoading?: boolean;
   onOk?: Function;
   onCancel?: Function;
   componentParams?: Object;
@@ -42,7 +44,8 @@ export class NzModalService {
   _confirmCompFactory: ComponentFactory<NzConfirmComponent>;
 
   constructor(private _appRef: ApplicationRef,
-              private _cfr: ComponentFactoryResolver) {
+              private _cfr: ComponentFactoryResolver,
+              private _locale: NzLocaleService) {
     this._modalCompFactory = this._cfr.resolveComponentFactory(NzModalComponent);
     this._confirmCompFactory = this._cfr.resolveComponentFactory(NzConfirmComponent);
   }
@@ -81,7 +84,8 @@ export class NzModalService {
       }
     });
 
-    props[ 'onOk' ] = this._getConfirmCb(props[ 'nzOnOk' ]);
+    const isShowConfirmLoading = !!config[ 'showConfirmLoading' ];
+    props[ 'onOk' ] = this._getConfirmCb(props[ 'nzOnOk' ], isShowConfirmLoading);
     props[ 'onCancel' ] = this._getConfirmCb(props[ 'nzOnCancel' ]);
     // 在service模式下，不需要nzOnOk，防止触发this.nzOnOk.emit(e);
     delete props[ 'nzOnOk' ];
@@ -89,8 +93,11 @@ export class NzModalService {
     return props;
   }
 
-  _getConfirmCb(fn?: Function): Function {
-    return (_close) => {
+  _getConfirmCb(fn?: Function, isShowConfirmLoading: boolean = false): Function {
+    return (_close, _instance) => {
+      if (isShowConfirmLoading) {
+        _instance.nzConfirmLoading = true;
+      }
       if (fn) {
         const ret = fn();
         if (!ret) {
@@ -132,7 +139,7 @@ export class NzModalService {
             setTimeout(() => {
               compRef.destroy();
             }, 200);
-          });
+          }, instance);
         }
       });
     });
@@ -220,8 +227,8 @@ export class NzModalService {
   confirm(props: ConfigInterface): NzModalSubject {
     const config = Object.assign({
       confirmType: 'confirm',
-      okText     : '确 定',
-      cancelText : '取 消'
+      okText     : this._locale.translate('Modal.okText'),
+      cancelText : this._locale.translate('Modal.cancelText')
     }, props);
     return this._openConfirm(config);
   }
