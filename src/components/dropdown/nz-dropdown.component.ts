@@ -1,28 +1,30 @@
+import { CdkConnectedOverlay, ConnectedOverlayPositionChange, ConnectionPositionPair } from '@angular/cdk/overlay';
 import {
-  Component,
-  ViewEncapsulation,
-  OnInit,
-  OnDestroy,
-  Input,
-  Renderer2,
-  ContentChild,
-  Output,
-  EventEmitter,
   AfterViewInit,
   ChangeDetectionStrategy,
-  ChangeDetectorRef
+  ChangeDetectorRef,
+  Component,
+  ContentChild,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  OnInit,
+  Output,
+  Renderer2,
+  ViewChild,
+  ViewEncapsulation
 } from '@angular/core';
-import { merge } from 'rxjs/observable/merge';
-import { debounceTime } from 'rxjs/operators/debounceTime';
 import { Observable } from 'rxjs/Observable';
+import { Observer } from 'rxjs/Observer';
 import { Subject } from 'rxjs/Subject';
 import { Subscription } from 'rxjs/Subscription';
-import { Observer } from 'rxjs/Observer'
+import { merge } from 'rxjs/observable/merge';
+import { debounceTime } from 'rxjs/operators/debounceTime';
+import { dropDownAnimation } from '../core/animation/dropdown-animations';
+import { DEFAULT_DROPDOWN_POSITIONS, POSITION_MAP } from '../core/overlay/overlay-position-map';
 import { NzMenuComponent } from '../menu/nz-menu.component';
-import { DropDownAnimation } from '../core/animation/dropdown-animations';
+import { toBoolean } from '../util/convert';
 import { NzDropDownDirective } from './nz-dropdown.directive';
-import { POSITION_MAP, DEFAULT_DROPDOWN_POSITIONS } from '../core/overlay/overlay-position-map';
-import { ConnectionPositionPair } from '@angular/cdk/overlay';
 
 export type NzPlacement = 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLeft' | 'topCenter' | 'topRight';
 
@@ -30,7 +32,7 @@ export type NzPlacement = 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLe
   selector       : 'nz-dropdown',
   encapsulation  : ViewEncapsulation.None,
   animations     : [
-    DropDownAnimation
+    dropDownAnimation
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template       : `
@@ -68,62 +70,81 @@ export type NzPlacement = 'bottomLeft' | 'bottomCenter' | 'bottomRight' | 'topLe
 })
 
 export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
+  private _clickHide = true;
+  private _visible = false;
   hasFilterButton = false;
   _triggerWidth = 0;
   _placement: NzPlacement = 'bottomLeft';
-  _dropDownPosition: 'top' | 'bottom' = 'bottom';
+  _dropDownPosition: 'top' | 'center' | 'bottom' = 'bottom';
   _positions: ConnectionPositionPair[] = [ ...DEFAULT_DROPDOWN_POSITIONS ];
   _subscription: Subscription;
   @ContentChild(NzDropDownDirective) _nzOrigin;
   @ContentChild(NzMenuComponent) _nzMenu;
   @Input() nzTrigger: 'click' | 'hover' = 'hover';
-  @Input() nzClickHide = true;
-  @Input() nzVisible = false;
   @Output() _visibleChange = new Subject<boolean>();
   @Output() nzVisibleChange: EventEmitter<boolean> = new EventEmitter();
+  @ViewChild(CdkConnectedOverlay) _cdkOverlay: CdkConnectedOverlay;
+
+  @Input()
+  set nzClickHide(value: boolean) {
+    this._clickHide = toBoolean(value);
+  }
+
+  get nzClickHide(): boolean {
+    return this._clickHide;
+  }
+
+  @Input()
+  set nzVisible(value: boolean) {
+    this._visible = toBoolean(value);
+  }
+
+  get nzVisible(): boolean {
+    return this._visible;
+  }
 
   @Input()
   set nzPlacement(value: NzPlacement) {
     this._placement = value;
     this._dropDownPosition = (this.nzPlacement.indexOf('top') !== -1) ? 'top' : 'bottom';
     this._positions.unshift(POSITION_MAP[ this._placement ] as ConnectionPositionPair);
-  };
+  }
 
   get nzPlacement(): NzPlacement {
     return this._placement;
   }
 
-  _onClickEvent() {
+  _onClickEvent(): void {
     if (this.nzTrigger === 'click') {
       this._show();
     }
   }
 
-  _onMouseEnterEvent(e) {
+  _onMouseEnterEvent(e: MouseEvent): void {
     if (this.nzTrigger === 'hover') {
       this._show();
     }
   }
 
-  _onMouseLeaveEvent(e) {
+  _onMouseLeaveEvent(e: MouseEvent): void {
     if (this.nzTrigger === 'hover') {
       this._hide();
     }
   }
 
-  _hide() {
+  _hide(): void {
     this._visibleChange.next(false);
   }
 
-  _show() {
+  _show(): void {
     this._visibleChange.next(true);
   }
 
-  _onPositionChange(position) {
+  _onPositionChange(position: ConnectedOverlayPositionChange): void {
     this._dropDownPosition = position.connectionPair.originY;
   }
 
-  _clickDropDown($event) {
+  _clickDropDown($event: MouseEvent): void {
     $event.stopPropagation();
     if (this.nzClickHide) {
       this._hide();
@@ -132,13 +153,17 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
 
   _setTriggerWidth(): void {
     this._triggerWidth = this._nzOrigin.elementRef.nativeElement.getBoundingClientRect().width;
+    /** should remove after https://github.com/angular/material2/pull/8765 merged **/
+    if (this._cdkOverlay && this._cdkOverlay.overlayRef) {
+      this._cdkOverlay.overlayRef.updateSize({
+        minWidth: this._triggerWidth
+      });
+    }
   }
 
   _onVisibleChange = (visible: boolean) => {
     if (visible) {
-      if (!this._triggerWidth) {
-        this._setTriggerWidth();
-      }
+      this._setTriggerWidth();
     }
     if (this.nzVisible !== visible) {
       this.nzVisible = visible;
@@ -147,25 +172,25 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
     this._changeDetector.markForCheck();
   }
 
-  _startSubscribe(observable$: Observable<boolean>) {
+  _startSubscribe(observable$: Observable<boolean>): void {
     this._subscription = observable$.pipe(debounceTime(300))
-      .subscribe(this._onVisibleChange)
+      .subscribe(this._onVisibleChange);
   }
 
-  ngOnInit() {
+  ngOnInit(): void {
     if (this._nzMenu) {
       this._nzMenu.setDropDown(true);
     }
   }
 
-  ngOnDestroy() {
+  ngOnDestroy(): void {
     if (this._subscription) {
       this._subscription.unsubscribe();
     }
   }
 
-  ngAfterViewInit() {
-    let mouse$: Observable<boolean>
+  ngAfterViewInit(): void {
+    let mouse$: Observable<boolean>;
     if (this.nzTrigger === 'hover') {
       mouse$ = Observable.create((observer: Observer<boolean>) => {
         const disposeMouseEnter = this._renderer.listen(this._nzOrigin.elementRef.nativeElement, 'mouseenter', () => {
@@ -177,7 +202,7 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
         return () => {
           disposeMouseEnter();
           disposeMouseLeave();
-        }
+        };
       });
     }
     if (this.nzTrigger === 'click') {
@@ -196,7 +221,7 @@ export class NzDropDownComponent implements OnInit, OnDestroy, AfterViewInit {
     this._startSubscribe(observable$);
   }
 
-  get _hasBackdrop() {
+  get _hasBackdrop(): boolean {
     return this.nzTrigger === 'click';
   }
 
