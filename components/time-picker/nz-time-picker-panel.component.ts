@@ -10,7 +10,7 @@ import {
   ViewChild
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { Subscription } from 'rxjs/Subscription';
+import { Subscription } from 'rxjs';
 import { reqAnimFrame } from '../core/polyfill/request-animation';
 import { NzUpdateHostClassService as UpdateCls } from '../core/services/update-host-class.service';
 import { isNotNil } from '../core/util/check';
@@ -43,6 +43,7 @@ export class NzTimePickerPanelComponent implements ControlValueAccessor, OnInit,
   private _defaultOpenValue = new Date();
   private _opened = false;
   private _allowEmpty = true;
+  prefixCls: string = 'ant-time-picker-panel';
   time = new TimeHolder();
   hourEnabled = true;
   minuteEnabled = true;
@@ -55,6 +56,7 @@ export class NzTimePickerPanelComponent implements ControlValueAccessor, OnInit,
   @ViewChild('hourListElement') hourListElement;
   @ViewChild('minuteListElement') minuteListElement;
   @ViewChild('secondListElement') secondListElement;
+  @Input() nzInDatePicker: boolean = false; // If inside a date-picker, more diff works need to be done
   @Input() nzAddOn: TemplateRef<void>;
   @Input() nzHideDisabledOptions = false;
   @Input() nzClearText: string;
@@ -87,8 +89,10 @@ export class NzTimePickerPanelComponent implements ControlValueAccessor, OnInit,
 
   @Input()
   set nzDefaultOpenValue(value: Date) {
-    this._defaultOpenValue = value;
-    this.time.setDefaultOpenValue(this.nzDefaultOpenValue);
+    if (isNotNil(value)) {
+      this._defaultOpenValue = value;
+      this.time.setDefaultOpenValue(this.nzDefaultOpenValue);
+    }
   }
 
   get nzDefaultOpenValue(): Date {
@@ -326,10 +330,10 @@ export class NzTimePickerPanelComponent implements ControlValueAccessor, OnInit,
 
   private setClassMap(): void {
     this.updateCls.updateHostClass(this.element.nativeElement, {
-      'ant-time-picker-panel'                                  : true,
-      [ `ant-time-picker-panel-column-${this.enabledColumns}` ]: true,
-      'ant-time-picker-panel-narrow'                           : this.enabledColumns < 3,
-      'ant-time-picker-panel-placement-bottomLeft'             : true
+      [`${this.prefixCls}`]                                   : true,
+      [`${this.prefixCls}-column-${this.enabledColumns}`]     : this.nzInDatePicker ? false : true,
+      [`${this.prefixCls}-narrow`]                            : this.enabledColumns < 3,
+      [`${this.prefixCls}-placement-bottomLeft`]              : this.nzInDatePicker ? false : true
     });
   }
 
@@ -375,6 +379,10 @@ export class NzTimePickerPanelComponent implements ControlValueAccessor, OnInit,
   }
 
   ngOnInit(): void {
+    if (this.nzInDatePicker) {
+      this.prefixCls = 'ant-calendar-time-picker';
+    }
+
     this.sub = this.time.changes.subscribe(() => {
       this.changed();
       this.touched();

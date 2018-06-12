@@ -3,8 +3,7 @@ import { async, fakeAsync, tick, ComponentFixture, TestBed } from '@angular/core
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { Observable } from 'rxjs/Observable';
-import { of } from 'rxjs/observable/of';
+import { of, Observable } from 'rxjs';
 import { dispatchMouseEvent, dispatchTouchEvent } from '../core/testing/dispatch-events';
 import { NzFormatBeforeDropEvent, NzFormatEmitEvent } from './interface';
 import { NzTreeNode } from './nz-tree-node';
@@ -116,6 +115,15 @@ describe('tree component test', () => {
       expect(treeElement.querySelectorAll('.ant-tree-checkbox-checked').length).toEqual(6);
       expect(checkSpy).toHaveBeenCalled();
       expect(checkSpy).toHaveBeenCalledTimes(1);
+      // for bug test https://github.com/NG-ZORRO/ng-zorro-antd/issues/1423
+      // auto merge child node
+      expect(treeInstance.treeComponent.getCheckedNodeList().length).toEqual(1);
+      expect(treeInstance.treeComponent.getCheckedNodeList()[0].title).toEqual('root1');
+      // cancel checked status
+      dispatchMouseEvent(targetNode, 'click');
+      fixture.detectChanges();
+      expect(treeElement.querySelectorAll('.ant-tree-checkbox-checked').length).toEqual(0);
+      expect(treeInstance.treeComponent.getCheckedNodeList().length).toEqual(0);
       // click toggle checked
       dispatchMouseEvent(targetNode, 'click');
       dispatchMouseEvent(targetNode, 'click');
@@ -154,7 +162,7 @@ describe('tree component test', () => {
       const searchSpy = spyOn(treeInstance, 'onSearch');
       treeInstance.searchValue = 'grand';
       fixture.detectChanges();
-      expect(treeElement.querySelectorAll('.font-red').length).toEqual(3);
+      expect(treeElement.querySelectorAll('.font-highlight').length).toEqual(3);
       expect(searchSpy).toHaveBeenCalled();
       expect(searchSpy).toHaveBeenCalledTimes(1);
     });
